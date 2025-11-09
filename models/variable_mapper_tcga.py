@@ -1,7 +1,6 @@
 """
 Variable Mapping for Han 2012 Cox Model - TCGA STAD Edition
 Maps TCGA STAD data to Han 2012 nomogram format
-Customized for Maximilian Dressler's risk calculator
 """
 
 import pandas as pd

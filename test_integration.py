@@ -1,6 +1,6 @@
 """
 Quick Test Script for Dual Model Integration
-Tests that all components work with your TCGA data
+Tests that all components work with the TCGA data
 """
 
 import sys

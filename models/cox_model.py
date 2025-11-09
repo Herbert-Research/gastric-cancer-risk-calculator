@@ -1,6 +1,5 @@
 """
 Cox Proportional Hazards Model Support
-Customized for Maximilian Dressler's Risk Calculator
 """
 
 import math
