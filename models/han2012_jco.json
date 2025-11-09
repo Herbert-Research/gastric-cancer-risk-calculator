@@ -1,0 +1,113 @@
+{
+  "id": "han2012_jco",
+  "name": "Han 2012 D2 Gastrectomy Survival Nomogram",
+  "citation": "Han DS, et al. J Clin Oncol. 2012;30(31):3834-3840. DOI: 10.1200/JCO.2012.41.8343",
+  "model_type": "cox",
+  "outcome": "overall_survival",
+  "description": "Cox proportional hazards model predicting 5- and 10-year overall survival after D2 gastrectomy for gastric cancer. Based on 7,954 patients from Seoul National University Hospital.",
+  "timepoints": [5, 10],
+  "baseline_survival": {
+    "note": "Baseline survival not explicitly provided in paper. Model calculates linear predictor only. For educational purposes, we use average baseline survival estimates from validation cohorts.",
+    "5_year_estimate": 0.65,
+    "10_year_estimate": 0.55,
+    "calibration_needed": true
+  },
+  "variables": {
+    "age": {
+      "type": "categorical",
+      "reference": "< 40",
+      "unit": "years",
+      "categories": {
+        "< 40": 0.0000,
+        "40-49": -0.1393,
+        "50-59": 0.0862,
+        "60-69": 0.4319,
+        ">= 70": 0.8154
+      },
+      "description": "Age at diagnosis in predefined categories"
+    },
+    "sex": {
+      "type": "categorical",
+      "reference": "male",
+      "categories": {
+        "male": 0.0000,
+        "female": -0.2231
+      },
+      "description": "Patient sex (female has protective effect)"
+    },
+    "location": {
+      "type": "categorical",
+      "reference": "upper",
+      "categories": {
+        "upper": 0.0000,
+        "middle": -0.1863,
+        "lower": -0.2877
+      },
+      "description": "Tumor location in stomach (upper/middle/lower third)"
+    },
+    "depth_of_invasion": {
+      "type": "categorical",
+      "reference": "mucosa",
+      "categories": {
+        "mucosa": 0.0000,
+        "submucosa": 0.2311,
+        "proper_muscle": 0.4637,
+        "subserosa": 0.9933,
+        "serosa": 1.2090,
+        "adjacent_organ_invasion": 1.9895
+      },
+      "description": "T stage / depth of tumor invasion",
+      "mapping": {
+        "T1a": "mucosa",
+        "T1b": "submucosa",
+        "T2": "proper_muscle",
+        "T3": "subserosa",
+        "T4a": "serosa",
+        "T4b": "adjacent_organ_invasion"
+      }
+    },
+    "metastatic_lymph_nodes": {
+      "type": "categorical",
+      "reference": "0",
+      "unit": "count",
+      "categories": {
+        "0": 0.0000,
+        "1-2": 0.2546,
+        "3-6": 0.7178,
+        "7-15": 1.1787,
+        ">= 16": 1.7281
+      },
+      "description": "Number of metastatic (positive) lymph nodes"
+    },
+    "examined_lymph_nodes": {
+      "type": "continuous",
+      "coefficient": -0.0943,
+      "unit": "count",
+      "description": "Number of examined lymph nodes (protective factor: more examined = better prognosis)",
+      "clinical_note": "Coefficient is per node. Model assumes ≥15 nodes examined (inclusion criteria)"
+    }
+  },
+  "inclusion_criteria": {
+    "min_examined_nodes": 15,
+    "surgery_type": "D2 lymphadenectomy",
+    "resection_status": "R0 (complete resection)",
+    "notes": "Model derived from patients who underwent D2 gastrectomy between 1986-2007"
+  },
+  "performance": {
+    "c_index_internal": 0.78,
+    "c_index_external": 0.79,
+    "calibration": "Within 10% margin in both validation cohorts",
+    "superiority": "Outperforms AJCC TNM 7th edition (0.78 vs 0.69, p<0.001)"
+  },
+  "validation": {
+    "internal": "2,654 patients (SNUH)",
+    "external": "2,500 patients (Cancer Institute Ariake Hospital, Tokyo, Japan)"
+  },
+  "limitations": [
+    "Baseline survival S0(t) not explicitly provided in paper",
+    "Model assumes Eastern population (Korean/Japanese)",
+    "Not recalibrated for Western populations",
+    "Does not account for adjuvant chemotherapy",
+    "Educational implementation - requires institutional validation for clinical use"
+  ]
+}

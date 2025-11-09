@@ -1,0 +1,30 @@
+{
+  "id": "heuristic_klass_v1",
+  "name": "KLASS-inspired heuristic (logistic form)",
+  "description": "Educational TN-based logistic model; replace with validated coefficients for clinical work.",
+  "citation": "Heuristic placeholder assembled by Maximilian Dressler (2025) referencing KLASS summaries.",
+  "intercept": -2.25,
+  "risk_floor": 0.02,
+  "risk_ceiling": 0.95,
+  "t_stage_weights": {
+    "T1": 0.0,
+    "T2": 0.9,
+    "T3": 1.6,
+    "T4": 2.2
+  },
+  "n_stage_weights": {
+    "N0": 0.0,
+    "N1": 1.1,
+    "N2": 1.9,
+    "N3": 2.7
+  },
+  "age_weight": {
+    "weight": 0.018,
+    "pivot": 50,
+    "positive_delta_only": true
+  },
+  "tumor_size_weight": {
+    "weight": 0.12
+  },
+  "ln_ratio_weight": 2.4
+}
