@@ -545,10 +545,10 @@ python risk_calculator.py --model-config models/heuristic_klass.json --survival-
 ## Repository Stewardship
 
 **Author:** Maximilian Herbert Dressler  
-**Institution:** [Your Institution]  
+**Institution:** Medical Faculty Mannheim, University of Heidelberg  
 **Purpose:** Medical PhD application - demonstrating computational risk modeling framework development  
 **Status:** Educational demonstration (not peer-reviewed, not clinically validated)  
-**Contact:** [Your Email]
+**Contact:** maximilian.dressler@stud.uni-heidelberg.de
 
 ## Acknowledgement
 

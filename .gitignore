@@ -42,3 +42,9 @@ eggs/
 *.log
 *.tmp
 *.temp
+
+# Matplotlib cache
+.matplotlib/
+
+# TCGA clinical data (licensed, not hosted in repository)
+data/tcga_2018_clinical_data.tsv
