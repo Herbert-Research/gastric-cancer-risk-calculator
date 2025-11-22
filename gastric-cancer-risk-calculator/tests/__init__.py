@@ -1,1 +1,1 @@
-from .test_cox_model import *
+# Test package init
