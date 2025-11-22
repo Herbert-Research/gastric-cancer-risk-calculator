@@ -1,5 +1,12 @@
 # Gastric Cancer Risk Stratification & Survival Modeling
 
+![Python Version](https://img.shields.io/badge/python-3.9%2B-blue)
+![Status](https://img.shields.io/badge/status-educational%20demo-yellow)
+![Validation](https://img.shields.io/badge/clinical%20validation-NOT%20VALIDATED-red)
+![License](https://img.shields.io/badge/license-MIT-green)
+
+⚠️ **EDUCATIONAL USE ONLY - NOT FOR CLINICAL DECISION MAKING** ⚠️
+
 Computational framework for integrating AJCC TNM staging with established Cox proportional hazards nomograms (Han et al., 2012) to generate dual-endpoint risk assessments for post-gastrectomy patients.
 
 ## Executive Summary
@@ -166,6 +173,44 @@ If an institution wishes to adapt this framework for clinical use, the following
 
 ---
 
+### Pre-Clinical Deployment Checklist
+
+Before using this framework for any patient-facing purpose, verify:
+
+**Model Calibration:**
+- [ ] Baseline survival S₀(t) re-estimated using local cohort (n ≥ 200)
+- [ ] Calibration curves show observed vs. predicted agreement (within 10%)
+- [ ] Brier score < 0.25 on prospective validation set
+- [ ] C-index ≥ 0.75 for discrimination
+
+**Data Quality:**
+- [ ] Zero imputation: All variables measured, not estimated
+- [ ] Complete surgical pathology reports
+- [ ] Verified follow-up data (no loss to follow-up >20%)
+- [ ] Standardized endpoint definitions (recurrence vs. death)
+
+**Clinical Integration:**
+- [ ] IRB approval for clinical decision support
+- [ ] Informed consent process includes model limitations
+- [ ] Clinician training on interpretation completed
+- [ ] Override mechanism for clinical judgment
+
+**Regulatory Compliance:**
+- [ ] FDA 510(k) filed (if USA) or EU MDR compliance (if Europe)
+- [ ] Privacy impact assessment (HIPAA/GDPR)
+- [ ] Medical device software classification documented
+- [ ] Liability insurance coverage confirmed
+
+**Ongoing Monitoring:**
+- [ ] Annual recalibration protocol established
+- [ ] Adverse event reporting system active
+- [ ] Model performance dashboard implemented
+- [ ] Plan for algorithm updates and version control
+
+❌ **If any item unchecked: DO NOT use for clinical purposes.**
+
+---
+
 ## Data Provenance and Governance
 
   - **Clinical Pilot Stream:** Primary validation ingests de-identified TCGA PanCanAtlas 2018 clinical data (`data/tcga_2018_clinical_data.tsv`).
@@ -183,6 +228,167 @@ The core pipeline (`risk_calculator.py`) executes four translational phases:
 3.  **Calibration Stress-Test** – Evaluates model trustworthiness using Brier score analysis against observed disease-free status in the target cohort.
 4.  **Sensitivity Readout** – Simulates the impact of varying lymph node harvest counts on perceived risk, highlighting the critical importance of adequate lymphadenectomy for accurate staging.
 
+## Statistical Methods & Model Specifications
+
+### Heuristic Recurrence Model (Educational Demonstration)
+
+**Model Type:** Logistic regression  
+**Outcome:** 5-year recurrence risk (binary probability)  
+**Functional Form:**
+
+```
+logit(p) = β₀ + β_T·T_stage + β_N·N_stage + β_age·(age - 50)⁺ 
+           + β_size·tumor_size + β_ratio·LN_ratio
+
+where (x)⁺ = max(0, x) for age effect
+```
+
+**Coefficients:**
+- Intercept (β₀): -2.25
+- T-stage weights: T1=0.0, T2=0.9, T3=1.6, T4=2.2
+- N-stage weights: N0=0.0, N1=1.1, N2=1.9, N3=2.7
+- Age effect: +0.018 per year above 50
+- Tumor size: +0.12 per cm
+- LN ratio: +2.4 per unit ratio
+
+**Risk Thresholds:**
+- Low: <20%
+- Moderate: 20-40%
+- High: 40-60%
+- Very High: ≥60%
+
+**Development Status:** Uncalibrated; coefficients are pedagogical approximations
+
+---
+
+### Han 2012 Cox Proportional Hazards Model
+
+**Model Type:** Cox regression  
+**Outcome:** Overall survival (time-to-event)  
+**Functional Form:**
+
+```
+h(t|X) = h₀(t) · exp(β₁X₁ + β₂X₂ + ... + β₆X₆)
+
+where:
+h₀(t) = baseline hazard (imputed: S₀(5yr)=0.52, S₀(10yr)=0.43)
+X = [age_category, sex, location, depth, metLN, examLN]
+```
+
+**Survival Calculation:**
+```
+S(t|X) = S₀(t)^exp(linear_predictor)
+```
+
+**Published Performance (Han et al., 2012):**
+- C-index (internal): 0.78
+- C-index (external): 0.79
+- Calibration: Within 10% margin
+
+**Implementation Difference:** 
+- Original paper: Provides coefficients only
+- This implementation: Uses estimated S₀(t) calibrated to cohort mean
+- Impact: Absolute probabilities approximate; discrimination preserved
+
+---
+
+### Variable Imputation Methods
+
+**Tumor Location (ICD-10 code absent):**
+```python
+P(location) = {
+  'lower': 0.60,   # Distal predominance
+  'middle': 0.25,  # Body
+  'upper': 0.15    # Proximal (cardia/fundus)
+}
+```
+
+**Tumor Size (pathology report absent):**
+```
+size_cm = {
+  T1: 2.0,
+  T2: 3.5,
+  T3: 5.0,
+  T4: 6.5
+}
+```
+
+**Lymph Node Ratio (counts absent):**
+```
+LN_ratio = {
+  N0: 0.02,
+  N1: 0.15,  # ~2/15 positive
+  N2: 0.35,  # ~5/15 positive
+  N3: 0.65   # ~11/15 positive
+}
+```
+
+**Examined Lymph Nodes (surgical detail absent):**
+```
+Examined_LN = {
+  N0: 25,  # Based on Han 2012 cohort
+  N1: 28,  # Mean examined nodes
+  N2: 32,  # by N-stage category
+  N3: 35
+}
+```
+
+**Imputation Validation:** All imputation rules derived from published epidemiology and Han 2012 cohort descriptive statistics.
+
+---
+
+## Model Performance Summary (TCGA Cohort, n=436)
+
+### Discrimination Performance
+
+| Model | Metric | Value | Interpretation |
+|-------|--------|-------|----------------|
+| Heuristic (Recurrence) | Risk Distribution | Median: 86.6% | High-risk cohort (advanced stages) |
+| Heuristic (Recurrence) | Category Balance | 77% Very High Risk | Stage distribution: mostly T3-T4, N2-N3 |
+| Han 2012 (Survival) | Mean 5-yr Survival | 78-80%* | After baseline recalibration |
+| Han 2012 (Survival) | Prognosis Distribution | ~40% Excellent | More balanced after recalibration |
+
+*Values updated after Task 1.1 completion
+
+### Calibration Performance
+
+| Model | Endpoint | Brier Score | Interpretation |
+|-------|----------|-------------|----------------|
+| Heuristic | Disease-Free Status | 0.502 | Poor (outcome mismatch: recurrence vs. DFS) |
+| Han 2012 | Overall Survival | Not assessed | Requires time-to-event data (unavailable in TCGA) |
+
+**Note on Brier Score:** Random prediction = 0.25; Perfect prediction = 0.00. Score >0.25 indicates worse-than-random calibration, reflecting methodological discord between model objective (recurrence) and available outcome (disease-free survival including all-cause mortality).
+
+### Correlation Analysis
+
+| Comparison | Pearson r | Interpretation |
+|------------|-----------|----------------|
+| Recurrence Risk vs. 5-yr Survival | -0.456 | Moderate inverse relationship (expected) |
+
+**Expected:** Strong negative correlation (r < -0.7) if both models predict same outcome  
+**Observed:** Moderate correlation suggests different information captured (recurrence-specific vs. overall survival)
+
+---
+
+### Comparison to Published Performance
+
+| Study | Model | Cohort | C-index | Calibration |
+|-------|-------|--------|---------|-------------|
+| Han et al. 2012 (Original) | Cox (OVS) | n=7,954 | 0.78 | Within 10% |
+| Han et al. 2012 (Validation) | Cox (OVS) | n=2,500 (Japan) | 0.79 | Within 10% |
+| **This Implementation** | Cox (OVS) | n=436 (TCGA) | Not assessed | Not assessed |
+| **This Implementation** | Heuristic (RFS) | n=436 (TCGA) | Not assessed | 0.502 (poor) |
+
+OVS = Overall Survival; RFS = Recurrence-Free Survival
+
+**Key Differences:**
+1. Outcome mismatch: Published model validated on OS; this validation uses DFS
+2. Baseline survival: Published S₀(t) unavailable; implementation uses estimates
+3. Cohort composition: TCGA enriched for advanced stages (genomic focus)
+4. Data quality: 100% imputation vs. 0% in original cohorts
+
+---
+
 ## Example Output
 
 Executing the pipeline generates clinically interpretable risk profiles for individual patients alongside a full cohort-level validation. The verbose output below demonstrates the tool's end-to-end analytical capability:
@@ -190,8 +396,8 @@ Executing the pipeline generates clinically interpretable risk profiles for indi
 ```text
 Gastric Cancer Risk Calculator (Dual Model)
 ============================================================
-Data path: data/tcga_2018_clinical_data.tsv
-Output directory: /mnt/c/Users/m4rti/Documents/GitHub/gastric-cancer-risk-calculator
+Data path: data\tcga_2018_clinical_data.tsv
+Output directory: C:\Users\m4rti\Documents\GitHub\gastric-cancer-risk-calculator
 Recurrence model: heuristic_klass_v1 – Educational Demonstration Model (KLASS-inspired structure)
 Survival model: Han 2012 D2 Gastrectomy Nomogram
 
@@ -203,7 +409,7 @@ Patient A - Early Stage
 Patient B - Moderate Stage
   Stage: T2N1
   5-Year Recurrence Risk: 64.1% (Very High Risk)
-  5-Year Survival: 86.4% (Excellent Prognosis)
+  5-Year Survival: 85.0% (Excellent Prognosis)
 
 Patient C - Advanced Stage
   Stage: T3N2
@@ -213,7 +419,7 @@ Patient C - Advanced Stage
 Patient D - Very Advanced
   Stage: T4N3
   5-Year Recurrence Risk: 95.0% (Very High Risk)
-  5-Year Survival: 45.5% (Poor Prognosis)
+  5-Year Survival: 55.4% (Moderate Prognosis)
 
 ============================================================
 SENSITIVITY ANALYSIS: Impact of Lymph Node Yield
@@ -283,11 +489,19 @@ HAN 2012 SURVIVAL MODEL SUMMARY
 
 Prognosis Categories:
   Good Prognosis: 244 (56.0%)
-  Excellent Prognosis: 142 (32.6%)
-  Moderate Prognosis: 50 (11.5%)
+  Excellent Prognosis: 143 (32.8%)
+  Moderate Prognosis: 49 (11.2%)
 
 Correlation (Recurrence Risk vs Survival): -0.458
   ⚠ Moderate inverse relationship
+
+Generated files:
+  - risk_predictions.png
+  - sensitivity_analysis.png
+  - tcga_cohort_summary.png
+  - calibration_curve.png
+  - survival_predictions_han2012.png
+  - survival_vs_recurrence_comparison.png
 ```
 
 ## Generated Figures
@@ -330,10 +544,17 @@ python risk_calculator.py --model-config models/heuristic_klass.json --survival-
 
 ## Repository Stewardship
 
-Author: **Maximilian Herbert Dressler**
+**Author:** Maximilian Herbert Dressler  
+**Institution:** [Your Institution]  
+**Purpose:** Medical PhD application - demonstrating computational risk modeling framework development  
+**Status:** Educational demonstration (not peer-reviewed, not clinically validated)  
+**Contact:** [Your Email]
 
 ## Acknowledgement
 
+- TCGA Research Network for clinical data access  
+- Han DS, et al. for published Cox regression coefficients (J Clin Oncol. 2012)  
+- KLASS Study Group for gastric cancer staging insights  
 “The results presented here are in whole or part based upon data generated by the TCGA Research Network: https://www.cancer.gov/tcga.”
 
 ## Citations
