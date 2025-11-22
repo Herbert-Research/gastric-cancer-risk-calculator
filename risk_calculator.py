@@ -12,9 +12,15 @@ from pathlib import Path
 import copy
 import json
 import math
+import os
 import sys
 from numbers import Number
 from typing import Any, TYPE_CHECKING
+
+BASE_DIR = Path(__file__).resolve().parent
+# Ensure Matplotlib cache uses a writable path (containers may block ~/.config).
+mplt_config_dir = Path(os.environ.setdefault("MPLCONFIGDIR", str(BASE_DIR / ".matplotlib")))
+mplt_config_dir.mkdir(parents=True, exist_ok=True)
 
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
@@ -27,8 +33,6 @@ sns.set_style("whitegrid")
 if TYPE_CHECKING:
     from models.cox_model import CoxModel
     from models.variable_mapper_tcga import Han2012VariableMapper
-
-BASE_DIR = Path(__file__).resolve().parent
 DEFAULT_DATA_PATH = BASE_DIR / "data" / "tcga_2018_clinical_data.tsv"
 DEFAULT_OUTPUT_DIR = BASE_DIR
 DEFAULT_MODEL_CONFIG = BASE_DIR / "models" / "heuristic_klass.json"
