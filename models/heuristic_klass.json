@@ -1,8 +1,9 @@
 {
   "id": "heuristic_klass_v1",
-  "name": "KLASS-inspired heuristic (logistic form)",
-  "description": "Educational TN-based logistic model; replace with validated coefficients for clinical work.",
-  "citation": "Heuristic placeholder assembled by Maximilian Dressler (2025) referencing KLASS summaries.",
+  "name": "Educational Demonstration Model (KLASS-inspired structure)",
+  "description": "Illustrative logistic regression model for teaching computational risk assessment. NOT clinically validated. Coefficients are pedagogical approximations inspired by published KLASS trial stage stratification patterns, not derived from formal model training.",
+  "citation": "Demonstration model by M.H. Dressler (2025). Structure inspired by: (1) Kim W, et al. Lancet. 2019;393(10178):1244-1253 (KLASS-02 trial); (2) Hyung WJ, et al. JAMA Surg. 2021;156(7):655-663 (KLASS risk patterns). NOT a reproduction of any published prediction model.",
+  "development_status": "Uncalibrated educational tool - not for clinical use",
   "intercept": -2.25,
   "risk_floor": 0.02,
   "risk_ceiling": 0.95,

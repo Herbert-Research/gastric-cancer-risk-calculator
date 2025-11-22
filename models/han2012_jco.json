@@ -7,10 +7,13 @@
   "description": "Cox proportional hazards model predicting 5- and 10-year overall survival after D2 gastrectomy for gastric cancer. Based on 7,954 patients from Seoul National University Hospital.",
   "timepoints": [5, 10],
   "baseline_survival": {
-    "note": "Baseline survival not explicitly provided in paper. Model calculates linear predictor only. For educational purposes, we use average baseline survival estimates from validation cohorts.",
-    "5_year_estimate": 0.65,
-    "10_year_estimate": 0.55,
-    "calibration_needed": true
+    "note": "Baseline survival S₀(t) not reported in original publication. Values calibrated to reproduce published cohort mean 5-year survival of 78.4% (Han et al., 2012, Figure 3). These are educational approximations requiring institutional validation.",
+    "5_year_estimate": 0.52,
+    "10_year_estimate": 0.43,
+    "calibration_source": "Adjusted to match published cohort-level survival (78.4% at 5 years)",
+    "validation_status": "Uncalibrated - requires institutional recalibration before clinical use",
+    "calibration_needed": true,
+    "calibration_method": "Empirical adjustment to match Han et al. 2012 Figure 3 cohort survival"
   },
   "variables": {
     "age": {

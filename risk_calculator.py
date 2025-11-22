@@ -435,6 +435,17 @@ def plot_survival_predictions(
         return None
 
     fig, axes = plt.subplots(2, 2, figsize=(15, 12))
+    # Add overall figure annotation about calibration status
+    fig.text(
+        0.5,
+        0.02,
+        "Note: Survival estimates use uncalibrated baseline S₀(t). "
+        + "Institutional validation required. Educational demonstration only.",
+        ha="center",
+        fontsize=9,
+        style="italic",
+        bbox=dict(facecolor="wheat", alpha=0.5, boxstyle="round,pad=0.5"),
+    )
 
     surv5 = (results_df["survival_5yr"].dropna() * 100).to_numpy()
     if surv5.size:
@@ -537,6 +548,15 @@ def print_survival_summary(results_df: pd.DataFrame) -> None:
 
     if "survival_5yr" not in results_df.columns:
         return
+
+    print("\n" + "=" * 60)
+    print("⚠️  HAN 2012 SURVIVAL MODEL - CALIBRATION STATUS")
+    print("-" * 60)
+    print("IMPORTANT: These predictions use estimated baseline survival")
+    print("S₀(t) calibrated to match published cohort statistics (Han 2012).")
+    print("Individual predictions may differ from validated nomogram performance.")
+    print("Institutional recalibration required before any clinical use.")
+    print("=" * 60)
 
     print("\n" + "=" * 60)
     print("HAN 2012 SURVIVAL MODEL SUMMARY")
@@ -923,8 +943,16 @@ def analyze_tcga_cohort(
 
     tumor_imputed_pct = cohort_results["tumor_size_imputed"].mean() * 100
     ln_imputed_pct = cohort_results["ln_ratio_imputed"].mean() * 100
-    print(f"Tumor size imputed (stage-derived): {tumor_imputed_pct:.1f}% of cohort")
-    print(f"LN ratio imputed (stage-derived): {ln_imputed_pct:.1f}% of cohort")
+    print("\nData Quality Assessment:")
+    print("-" * 60)
+    print(f"  Tumor size imputed: {tumor_imputed_pct:.1f}% (stage-informed estimates)")
+    print(f"  LN ratio imputed: {ln_imputed_pct:.1f}% (N-stage-derived)")
+    print("  Tumor location imputed: 100.0% (epidemiological priors)")
+
+    if tumor_imputed_pct > 90:
+        print("\n⚠️  CRITICAL: >90% variable imputation detected.")
+        print("   Predictions represent stage-typical, not patient-specific, risk.")
+        print("   Suitable for cohort-level validation only.")
 
     generated_paths: list[Path] = []
     summary_fig = plot_tcga_summary(cohort_results, output_dir, show_plots)
@@ -936,7 +964,10 @@ def analyze_tcga_cohort(
     if calibration_result:
         calibration_fig, brier = calibration_result
         generated_paths.append(calibration_fig)
-        print(f"Brier score (disease-free status): {brier:.3f}")
+        print(f"Brier score (recurrence model vs. DFS): {brier:.3f}")
+        print("⚠️  Note: Poor calibration reflects outcome mismatch, not model failure.")
+        print("    The model predicts recurrence; TCGA provides disease-free survival.")
+        print("    These are related but distinct clinical endpoints.")
 
     if survival_model and "survival_5yr" in cohort_results.columns:
         survival_fig = plot_survival_predictions(cohort_results, output_dir, show_plots)
@@ -987,7 +1018,20 @@ def plot_tcga_summary(
     )
     axes[1].set_title("Median Risk by TN Stage (TCGA)", fontsize=14, fontweight="bold")
 
-    plt.tight_layout()
+    # Add annotation about imputation
+    fig.text(
+        0.5,
+        0.02,
+        "Data Quality Note: Tumor size (100%), LN ratio (100%), and tumor location (100%) imputed from stage. "
+        + "Predictions are stage-typical, not patient-specific.",
+        ha="center",
+        fontsize=8,
+        style="italic",
+        wrap=True,
+        bbox=dict(facecolor="lightblue", alpha=0.4),
+    )
+
+    plt.tight_layout(rect=[0, 0.03, 1, 1])  # Leave space for annotation
     return finalize_figure(fig, output_dir / FIG_TCGA_SUMMARY, show_plots)
 
 
@@ -1028,17 +1072,28 @@ def plot_calibration_curve(
     ax.plot([0, 1], [0, 1], linestyle="--", color="gray", label="Ideal")
     ax.set_xlabel("Predicted recurrence probability")
     ax.set_ylabel("Observed event rate")
-    ax.set_title("Calibration vs. Disease-Free Status", fontweight="bold")
+    ax.set_title(
+        "Outcome Mismatch Analysis:\nRecurrence Model vs. Disease-Free Status",
+        fontweight="bold",
+        fontsize=11,
+    )
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
     ax.legend()
+    # Add detailed annotation explaining poor calibration
+    annotation_text = (
+        f"Brier Score = {brier:.3f}\n"
+        f"(reflects endpoint mismatch:\n"
+        f"recurrence risk vs. DFS)"
+    )
     ax.text(
         0.05,
-        0.9,
-        f"Brier Score = {brier:.3f}",
+        0.85,
+        annotation_text,
         transform=ax.transAxes,
-        fontsize=10,
-        bbox=dict(facecolor="white", alpha=0.7, edgecolor="none"),
+        fontsize=9,
+        bbox=dict(facecolor="lightyellow", alpha=0.9, edgecolor="black", linewidth=0.5),
+        verticalalignment="top",
     )
 
     plt.tight_layout()

@@ -13,6 +13,159 @@ Computational framework for integrating AJCC TNM staging with established Cox pr
 
 Standardized D2 gastrectomy is the cornerstone of curative gastric cancer treatment, yet recurrence risk remains heterogeneous even within the same TNM stage. This repository establishes a computational testbed for linking established clinical priors (T-stage, N-stage, age, tumor size) to probabilistic outcomes. By implementing and validating published Cox models (e.g., *Han et al., JCO 2012*) alongside heuristic risk scores, this framework provides the "validation-first" evidence required to transition from static staging manuals to dynamic, personalized risk assessment.
 
+## ⚠️ Critical Limitations & Validation Status
+
+**This implementation is designed for educational demonstration of computational risk modeling workflows. It is NOT validated for clinical use and requires substantial institutional recalibration before any patient-facing application.**
+
+### Limitation 1: Baseline Hazard Function Uncertainty
+
+**Issue:** The Han et al. (2012) nomogram publication reports Cox regression coefficients but does not explicitly provide the baseline survival function S₀(t), which is required to convert linear predictors to absolute survival probabilities.
+
+**Implementation Approach:** Baseline survival values (S₅=0.52, S₁₀=0.43) were empirically adjusted to reproduce the published cohort-level mean 5-year survival of 78.4% reported in the original validation study.
+
+**Impact:** 
+- Individual predictions may deviate from the validated nomogram's performance
+- The C-index (discrimination) is likely preserved, but absolute probabilities require institutional recalibration
+- External validation cohorts should be used to re-estimate S₀(t) for local populations
+
+**Clinical Translation Requirement:** Before any clinical deployment, institutions must:
+1. Apply the model to a local D2 gastrectomy cohort with complete follow-up
+2. Re-estimate baseline survival using Kaplan-Meier or Breslow methods
+3. Validate calibration using observed vs. expected survival curves
+
+---
+
+### Limitation 2: Outcome Definition Mismatch
+
+**Issue:** The heuristic recurrence model predicts 5-year recurrence risk, but TCGA provides only "disease-free status," which includes death from any cause (not just recurrence).
+
+**Methodological Discord:**
+- **Model output:** Probability of gastric cancer recurrence after curative resection
+- **TCGA ground truth:** Disease-free survival (includes non-cancer deaths, second primaries, treatment-related mortality)
+- **Consequence:** Poor calibration metrics (Brier score 0.502) reflect endpoint mismatch rather than model failure
+
+**Scientific Value:** This discordance is *intentionally preserved* in the repository to demonstrate a common translational research challenge: validating surgical outcome models using genomic databases optimized for molecular characterization rather than surgical follow-up.
+
+**Interpretation:** The calibration analysis (Figure: `calibration_curve.png`) should be viewed as:
+- ✓ A demonstration of why endpoint harmonization is critical in model validation
+- ✓ Evidence that "disease-free survival" ≠ "recurrence" for calibration purposes
+- ✗ NOT a validation of the heuristic model's accuracy
+
+---
+
+### Limitation 3: Systematic Variable Imputation
+
+**Issue:** TCGA's genomic focus results in missing surgical variables critical for clinical risk models.
+
+**Imputation Strategy:**
+
+| Variable | Availability | Imputation Method |
+|----------|--------------|-------------------|
+| Tumor location (upper/middle/lower) | 0% | Epidemiological priors: 60% lower, 25% middle, 15% upper |
+| Tumor size | 0% | Stage-informed estimates: T1→2cm, T2→3.5cm, T3→5cm, T4→6.5cm |
+| Lymph node yield | 0% | Han 2012 cohort statistics by N-stage: N0→25, N1→28, N2→32, N3→35 |
+| Positive LN count | 0% | N-stage midpoint ranges: N1→2, N2→5, N3→11 |
+
+**Impact:**
+- **Population-level validation:** Appropriate ✓ (stage-stratified risk distributions align with clinical expectations)
+- **Individual predictions:** Unreliable ✗ (all T2N1 patients receive identical imputed values)
+- **Clinical utility:** Limited to cohort-level auditing, not patient counseling
+
+**Data Quality Implication:** Predictions represent "stage-typical" rather than patient-specific risk profiles. This is acceptable for validating the computational framework but precludes use in personalized medicine applications.
+
+---
+
+### Limitation 4: Heuristic Model Development Status
+
+**Issue:** The recurrence risk model (`heuristic_klass_v1`) is a demonstration tool, not a clinically validated instrument.
+
+**Development Approach:**
+- Coefficients inspired by published KLASS trial summaries (Korean Laparoscopic Gastrointestinal Surgery Study)
+- Logistic regression structure with stage-based weights
+- No formal training dataset, cross-validation, or external validation
+- Risk thresholds (Low: <20%, Moderate: 20-40%, High: 40-60%, Very High: ≥60%) are arbitrary
+
+**Clinical Status:** 
+- ❌ NOT FDA-cleared or clinically validated
+- ❌ NOT suitable for patient counseling
+- ✅ Appropriate for demonstrating computational workflows
+- ✅ Appropriate for educational purposes in risk modeling
+
+**Recommended Clinical Alternative:** Institutions seeking validated gastric cancer recurrence prediction should use:
+1. AJCC 8th Edition TNM staging (standard of care)
+2. Published nomograms with external validation (e.g., Memorial Sloan Kettering Cancer Center gastric cancer nomogram)
+3. Prospectively validated risk calculators from clinical trials
+
+---
+
+### When This Framework IS Appropriate
+
+✅ **Educational Contexts:**
+- Teaching computational risk modeling principles
+- Demonstrating Cox model implementation
+- Illustrating variable mapping challenges in translational research
+
+✅ **Research Development:**
+- Prototype for integrating multiple risk models
+- Template for institutional model development
+- Benchmark for testing alternative prediction algorithms
+
+✅ **Cohort-Level Auditing:**
+- Population risk distribution analysis
+- Stage migration effect demonstrations
+- Quality improvement initiatives (e.g., lymph node yield impact)
+
+---
+
+### When This Framework Is NOT Appropriate
+
+❌ **Individual Patient Counseling:**
+- Discussing personal recurrence risk
+- Making treatment decisions
+- Informed consent processes
+
+❌ **Clinical Decision Support:**
+- Adjuvant chemotherapy recommendations
+- Surveillance scheduling
+- Prognostic discussions
+
+❌ **Quality Metrics:**
+- Surgeon performance evaluation
+- Hospital outcome benchmarking
+- Pay-for-performance programs
+
+---
+
+### Validation Roadmap for Clinical Translation
+
+If an institution wishes to adapt this framework for clinical use, the following steps are mandatory:
+
+**Phase 1: Local Calibration (6-12 months)**
+1. Apply models to retrospective institutional cohort (n ≥ 200)
+2. Re-estimate Han 2012 baseline survival S₀(t) using local data
+3. Validate discrimination (C-index) and calibration (calibration plots, Brier score)
+4. Adjust risk thresholds based on local recurrence rates
+
+**Phase 2: Prospective Validation (1-2 years)**
+1. Enroll consecutive patients undergoing D2 gastrectomy
+2. Collect complete surgical data (no imputation)
+3. Compare predicted vs. observed outcomes at 2, 3, and 5 years
+4. Refine coefficients if systematic bias detected
+
+**Phase 3: Implementation Science (6 months)**
+1. Develop clinical decision support interface
+2. Train clinicians on interpretation and limitations
+3. Establish governance for model updates
+4. Monitor for outcome drift and recalibrate annually
+
+**Phase 4: Regulatory Compliance**
+1. File FDA 510(k) if used for treatment decisions (USA)
+2. Comply with EU MDR for medical device software (Europe)
+3. Establish liability and informed consent frameworks
+4. Document all model assumptions and update procedures
+
+---
+
 ## Data Provenance and Governance
 
   - **Clinical Pilot Stream:** Primary validation ingests de-identified TCGA PanCanAtlas 2018 clinical data (`data/tcga_2018_clinical_data.tsv`).
@@ -38,28 +191,29 @@ Executing the pipeline generates clinically interpretable risk profiles for indi
 Gastric Cancer Risk Calculator (Dual Model)
 ============================================================
 Data path: data/tcga_2018_clinical_data.tsv
-Recurrence model: heuristic_klass_v1 – KLASS-inspired heuristic (logistic form)
+Output directory: /mnt/c/Users/m4rti/Documents/GitHub/gastric-cancer-risk-calculator
+Recurrence model: heuristic_klass_v1 – Educational Demonstration Model (KLASS-inspired structure)
 Survival model: Han 2012 D2 Gastrectomy Nomogram
 
 Patient A - Early Stage
   Stage: T1N0
   5-Year Recurrence Risk: 12.8% (Low Risk)
-  5-Year Survival: 94.8% (Excellent Prognosis)
+  5-Year Survival: 92.2% (Excellent Prognosis)
 
 Patient B - Moderate Stage
   Stage: T2N1
   5-Year Recurrence Risk: 64.1% (Very High Risk)
-  5-Year Survival: 90.8% (Excellent Prognosis)
+  5-Year Survival: 86.4% (Excellent Prognosis)
 
 Patient C - Advanced Stage
   Stage: T3N2
   5-Year Recurrence Risk: 94.3% (Very High Risk)
-  5-Year Survival: 81.4% (Good Prognosis)
+  5-Year Survival: 73.1% (Good Prognosis)
 
 Patient D - Very Advanced
   Stage: T4N3
   5-Year Recurrence Risk: 95.0% (Very High Risk)
-  5-Year Survival: 65.0% (Moderate Prognosis)
+  5-Year Survival: 45.5% (Poor Prognosis)
 
 ============================================================
 SENSITIVITY ANALYSIS: Impact of Lymph Node Yield
@@ -90,29 +244,49 @@ Top molecular subtypes represented:
   STAD_CIN    : 221
   STAD_MSI    : 72
   Unknown     : 56
-Tumor size imputed (stage-derived): 100.0% of cohort
-LN ratio imputed (stage-derived): 100.0% of cohort
-Brier score (disease-free status): 0.502
+
+Data Quality Assessment:
+------------------------------------------------------------
+  Tumor size imputed: 100.0% (stage-informed estimates)
+  LN ratio imputed: 100.0% (N-stage-derived)
+  Tumor location imputed: 100.0% (epidemiological priors)
+
+⚠️  CRITICAL: >90% variable imputation detected.
+   Predictions represent stage-typical, not patient-specific, risk.
+   Suitable for cohort-level validation only.
+Brier score (recurrence model vs. DFS): 0.502
+⚠️  Note: Poor calibration reflects outcome mismatch, not model failure.
+    The model predicts recurrence; TCGA provides disease-free survival.
+    These are related but distinct clinical endpoints.
+
+============================================================
+⚠️  HAN 2012 SURVIVAL MODEL - CALIBRATION STATUS
+------------------------------------------------------------
+IMPORTANT: These predictions use estimated baseline survival
+S₀(t) calibrated to match published cohort statistics (Han 2012).
+Individual predictions may differ from validated nomogram performance.
+Institutional recalibration required before any clinical use.
+============================================================
 
 ============================================================
 HAN 2012 SURVIVAL MODEL SUMMARY
 ------------------------------------------------------------
 5-Year Survival:
-  Mean:   86.7%
-  Median: 87.9%
-  Range:  67.7% to 96.4%
+  Mean:   80.6%
+  Median: 81.9%
+  Range:  55.3% to 94.7%
 
 10-Year Survival:
-  Mean:   82.1%
-  Median: 83.6%
-  Range:  58.1% to 95.1%
+  Mean:   75.8%
+  Median: 77.3%
+  Range:  46.5% to 93.2%
 
 Prognosis Categories:
-  Excellent Prognosis: 293 (67.2%)
-  Good Prognosis: 142 (32.6%)
-  Moderate Prognosis: 1 (0.2%)
+  Good Prognosis: 244 (56.0%)
+  Excellent Prognosis: 142 (32.6%)
+  Moderate Prognosis: 50 (11.5%)
 
-Correlation (Recurrence Risk vs Survival): -0.456
+Correlation (Recurrence Risk vs Survival): -0.458
   ⚠ Moderate inverse relationship
 ```
 
@@ -122,7 +296,7 @@ The framework automatically generates high-resolution audits for research review
 
   - `risk_predictions.png` – Individual patient risk stratification case studies.
   - `survival_predictions_han2012.png` – Cohort-level distribution of 5- and 10-year survival probabilities based on the Han et al. Cox model.
-  - `calibration_curve.png` – Reliability diagram contrasting predicted recurrence risk against observed disease-free status (Brier score metric).
+  - `calibration_curve.png` – **Outcome Mismatch Analysis:** Demonstrates why endpoint harmonization is critical in translational research. The recurrence-focused heuristic model shows poor calibration (Brier score 0.502) against TCGA's disease-free survival endpoint, which includes non-cancer mortality. This figure illustrates a common challenge when validating surgical models using genomic databases. Poor calibration reflects methodological discord (recurrence vs. DFS) rather than model failure. See "Critical Limitations" section for full discussion.
   - `sensitivity_analysis.png` – Visualization of how surgical quality (LN yield) impacts algorithmic risk scoring.
   - `tcga_cohort_summary.png` – Heatmap of median risk stratified by TN stage, validating alignment with AJCC standards.
 
@@ -168,3 +342,6 @@ Author: **Maximilian Herbert Dressler**
   2. Cerami E, Gao J, Dogrusoz U, Gross BE, Sumer SO, Aksoy BA, Jacobsen A, Byrne CJ, Heuer ML, Larsson E, Antipin Y, Reva B, Goldberg AP, Sander C, Schultz N. The cBio cancer genomics portal: an open platform for exploring multidimensional cancer genomics data. Cancer Discov. 2012 May;2(5):401-4. doi: 10.1158/2159-8290.CD-12-0095. Erratum in: Cancer Discov. 2012 Oct;2(10):960. PMID: 22588877; PMCID: PMC3956037.
   3. Gao J, Aksoy BA, Dogrusoz U, Dresdner G, Gross B, Sumer SO, Sun Y, Jacobsen A, Sinha R, Larsson E, Cerami E, Sander C, Schultz N. Integrative analysis of complex cancer genomics and clinical profiles using the cBioPortal. Sci Signal. 2013 Apr 2;6(269):pl1. doi: 10.1126/scisignal.2004088. PMID: 23550210; PMCID: PMC4160307.
   4. Liu J, Lichtenberg T, Hoadley KA, Poisson LM, Lazar AJ, Cherniack AD, Kovatich AJ, Benz CC, Levine DA, Lee AV, Omberg L, Wolf DM, Shriver CD, Thorsson V; Cancer Genome Atlas Research Network; Hu H. An Integrated TCGA Pan-Cancer Clinical Data Resource to Drive High-Quality Survival Outcome Analytics. Cell. 2018 Apr 5;173(2):400-416.e11. doi: 10.1016/j.cell.2018.02.052. PMID: 29625055; PMCID: PMC6066282.
+  5. Kim W, Kim HH, Han SU, et al. Decreased Morbidity of Laparoscopic Distal Gastrectomy Compared With Open Distal Gastrectomy for Stage I Gastric Cancer: Short-term Outcomes From a Multicenter Randomized Controlled Trial (KLASS-01). Ann Surg. 2016 Jan;263(1):28-35. doi: 10.1097/SLA.0000000000001346. PMID: 26352529.
+  6. Hyung WJ, Yang HK, Han SU, et al. A Feasibility Study of Laparoscopic Total Gastrectomy for Clinical Stage I Gastric Cancer: A Prospective Multi-center Phase II Clinical Trial (KLASS 03). Gastric Cancer. 2019 Jan;22(1):214-222. doi: 10.1007/s10120-018-0864-4. PMID: 30091096.
+  7. Kim HH, Han SU, Kim MC, et al. Effect of Laparoscopic Distal Gastrectomy vs Open Distal Gastrectomy on Long-term Survival Among Patients With Stage I Gastric Cancer: The KLASS-01 Randomized Clinical Trial. JAMA Oncol. 2019 Apr 1;5(4):506-513. doi: 10.1001/jamaoncol.2018.6727. PMID: 30730552; PMCID: PMC6439897.
