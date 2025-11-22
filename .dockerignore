@@ -1,0 +1,40 @@
+# Version control and editor metadata
+.git
+.gitignore
+.vscode
+.idea
+*.swp
+*.swo
+.DS_Store
+
+# Python bytecode and build artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.pytest_cache/
+.mypy_cache/
+.cache/
+.coverage
+.eggs/
+*.egg-info/
+build/
+dist/
+
+# Virtual environments and local config
+.env
+.env.*
+.venv
+venv
+ENV
+env
+.ipynb_checkpoints
+
+# Generated outputs and logs
+example_outputs/
+pytest.log
+*.log
+
+# Optional: uncomment to keep large local data out of the image
+# data/tcga_2018_clinical_data.tsv
