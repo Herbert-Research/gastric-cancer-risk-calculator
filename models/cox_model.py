@@ -2,8 +2,10 @@
 Cox Proportional Hazards Model Support
 """
 
+from __future__ import annotations
+
 import math
-from typing import Any, Dict, Tuple
+from typing import Any
 
 
 class CoxModel:
@@ -71,11 +73,11 @@ class CoxModel:
         survival_10yr = max(0.0, min(1.0, survival_10yr))
         return {5: survival_5yr, 10: survival_10yr}
 
-    def predict_patient_survival(self, patient_data: dict[str, Any]) -> Dict[int, float]:
+    def predict_patient_survival(self, patient_data: dict[str, Any]) -> dict[int, float]:
         """Public API to compute survival probabilities at configured time points."""
         return self.calculate_survival(patient_data)
 
-    def categorize_risk(self, survival_5yr: float) -> Tuple[str, str]:
+    def categorize_risk(self, survival_5yr: float) -> tuple[str, str]:
         """Return prognosis category plus descriptive text."""
         category = self._survival_category_label(survival_5yr)
         description = self.PROGNOSIS_DESCRIPTIONS.get(

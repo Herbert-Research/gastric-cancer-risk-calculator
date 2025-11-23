@@ -3,10 +3,18 @@ Variable Mapping for Han 2012 Cox Model - TCGA STAD Edition
 Maps TCGA STAD data to Han 2012 nomogram format
 """
 
-import pandas as pd
-import numpy as np
-from typing import Dict, Optional
+from __future__ import annotations
 
+from typing import Any, Optional
+
+import numpy as np
+import pandas as pd
+
+from utils.logging_config import get_logger, setup_logging
+
+# Reproducible imputation RNG (seeded for deterministic sampling)
+_RNG = np.random.default_rng(seed=42)
+logger = get_logger()
 
 class Han2012VariableMapper:
     """Maps TCGA STAD clinical data to Han 2012 nomogram format."""
@@ -80,11 +88,13 @@ class Han2012VariableMapper:
         - C16.4 (pylorus): lower
         - C16.5 (lesser curvature): middle
         - C16.6 (greater curvature): middle
-        - C16.8 (overlapping): random based on distribution
-        - C16.9 (NOS): random based on distribution
+        - C16.8 (overlapping): imputed based on distribution
+        - C16.9 (NOS): imputed based on distribution
         
         If no ICD code, use epidemiological distribution: 
         Lower (60%), Middle (25%), Upper (15%).
+        
+        Note: Uses a seeded RNG for reproducible imputation.
         """
         if icd_code and not pd.isna(icd_code):
             icd_str = str(icd_code).strip().upper()
@@ -96,13 +106,12 @@ class Han2012VariableMapper:
                 return 'lower'
             elif icd_str in ['C16.5', 'C16.6']:
                 return 'middle'
-            # For C16.8, C16.9, or others, use distribution
-        
-        # Default to distribution-based sampling
-        import random
+        # For C16.8, C16.9, or others, use distribution
+
+        # Default to distribution-based sampling (seeded for reproducibility)
         locations = ['lower', 'middle', 'upper']
         weights = [0.60, 0.25, 0.15]  # Epidemiological distribution
-        return random.choices(locations, weights=weights, k=1)[0]
+        return _RNG.choice(locations, p=weights)
     
     @staticmethod
     def map_depth_of_invasion(t_stage: Optional[str]) -> str:
@@ -188,7 +197,7 @@ class Han2012VariableMapper:
         )
     
     @staticmethod
-    def map_patient_from_dict(patient_dict: Dict) -> Dict:
+    def map_patient_from_dict(patient_dict: dict[str, Any]) -> dict[str, Any]:
         """
         Map a patient dictionary (from your risk calculator) to Han 2012 format.
         
@@ -223,7 +232,7 @@ class Han2012VariableMapper:
         return han_patient
     
     @staticmethod
-    def get_imputation_flags(patient_dict: Dict) -> Dict:
+    def get_imputation_flags(patient_dict: dict[str, Any]) -> dict[str, Any]:
         """
         Track which variables were imputed vs directly measured.
         
@@ -243,10 +252,18 @@ class Han2012VariableMapper:
         }
 
 
+def reset_imputation_seed(seed: int = 42) -> None:
+    """
+    Reset the imputation RNG for reproducible sampling in tests and pipelines.
+    """
+    global _RNG
+    _RNG = np.random.default_rng(seed=seed)
+
+
 def test_mapper():
     """Test the mapper with sample data."""
-    print("Testing Han 2012 Variable Mapper for TCGA Data")
-    print("=" * 60)
+    logger.info("Testing Han 2012 Variable Mapper for TCGA Data")
+    logger.info("=" * 60)
     
     test_patient = {
         'age': 65,
@@ -261,20 +278,25 @@ def test_mapper():
     han_patient = mapper.map_patient_from_dict(test_patient)
     imputation_flags = mapper.get_imputation_flags(test_patient)
     
-    print("\nOriginal Patient Data:")
+    logger.info("")
+    logger.info("Original Patient Data:")
     for key, value in test_patient.items():
-        print(f"  {key}: {value}")
+        logger.info("  %s: %s", key, value)
     
-    print("\nMapped to Han 2012 Format:")
+    logger.info("")
+    logger.info("Mapped to Han 2012 Format:")
     for key, value in han_patient.items():
-        print(f"  {key}: {value}")
+        logger.info("  %s: %s", key, value)
     
-    print("\nImputation Flags:")
+    logger.info("")
+    logger.info("Imputation Flags:")
     for key, value in imputation_flags.items():
-        print(f"  {key}: {value}")
+        logger.info("  %s: %s", key, value)
     
-    print("\n" + "=" * 60)
+    logger.info("")
+    logger.info("=" * 60)
 
 
 if __name__ == '__main__':
+    setup_logging()
     test_mapper()

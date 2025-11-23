@@ -42,6 +42,7 @@ eggs/
 *.log
 *.tmp
 *.temp
+.joblib_temp/
 
 # Matplotlib cache
 .matplotlib/

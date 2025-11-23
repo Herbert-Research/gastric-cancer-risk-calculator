@@ -3,6 +3,8 @@ Quick Test Script for Dual Model Integration
 Tests that all components work with the TCGA data
 """
 
+from __future__ import annotations
+
 import sys
 import json
 from pathlib import Path

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import pytest
 from models.cox_model import CoxModel
 

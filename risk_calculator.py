@@ -8,13 +8,14 @@ Based on: Simplified models from KLASS literature
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 import copy
 import json
+import logging
 import math
 import os
+from pathlib import Path
 from numbers import Number
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 BASE_DIR = Path(__file__).resolve().parent
 # Ensure Matplotlib cache uses a writable path (containers may block ~/.config).
@@ -39,6 +40,7 @@ from utils.visualization import (
     plot_survival_vs_recurrence,
     plot_tcga_summary,
 )
+from utils.logging_config import get_logger, setup_logging
 
 if TYPE_CHECKING:
     from models.cox_model import CoxModel
@@ -48,13 +50,15 @@ DEFAULT_OUTPUT_DIR = BASE_DIR
 DEFAULT_MODEL_CONFIG = BASE_DIR / "models" / "heuristic_klass.json"
 DEFAULT_SURVIVAL_MODEL_CONFIG = BASE_DIR / "models" / "han2012_jco.json"
 
+logger = get_logger()
+
 try:
     from models.cox_model import CoxModel
     from models.variable_mapper_tcga import Han2012VariableMapper
     COX_MODEL_AVAILABLE = True
 except ImportError:
     COX_MODEL_AVAILABLE = False
-    print("Warning: Cox survival components unavailable; use --skip-survival to suppress.")
+    logger.warning("Cox survival components unavailable; use --skip-survival to suppress.")
 
 FIG_SENSITIVITY = "sensitivity_analysis.png"
 
@@ -98,9 +102,9 @@ def load_model_config(config_path: Path | None = None) -> dict[str, Any]:
             with target_path.open("r", encoding="utf-8") as stream:
                 payload = json.load(stream)
         except json.JSONDecodeError as exc:
-            print(f"Unable to parse {target_path}: {exc}. Falling back to bundled config.")
+            logger.warning("Unable to parse %s: %s. Falling back to bundled config.", target_path, exc)
         except OSError as exc:
-            print(f"Unable to read {target_path}: {exc}. Falling back to bundled config.")
+            logger.warning("Unable to read %s: %s. Falling back to bundled config.", target_path, exc)
 
     return payload
 
@@ -113,7 +117,7 @@ def load_survival_model(config_path: Path | None = None) -> CoxModel | None:
 
     target_path = config_path or DEFAULT_SURVIVAL_MODEL_CONFIG
     if not target_path or not target_path.exists():
-        print(f"Survival model config not found at {target_path}")
+        logger.warning("Survival model config not found at %s", target_path)
         return None
 
     try:
@@ -121,7 +125,7 @@ def load_survival_model(config_path: Path | None = None) -> CoxModel | None:
             config = json.load(stream)
         return CoxModel(config)
     except Exception as exc:  # pragma: no cover - defensive
-        print(f"Unable to load survival model: {exc}")
+        logger.exception("Unable to load survival model: %s", exc)
         return None
 
 
@@ -162,6 +166,12 @@ def parse_args() -> argparse.Namespace:
         "--skip-survival",
         action="store_true",
         help="Skip survival predictions (recurrence only).",
+    )
+    parser.add_argument(
+        "--verbose",
+        "-v",
+        action="store_true",
+        help="Enable verbose (DEBUG) logging output.",
     )
     return parser.parse_args()
 
@@ -345,7 +355,7 @@ def predict_with_both_models(
                     survival_category.append(None)
                     survival_desc.append(None)
             except Exception as exc:  # pragma: no cover - defensive logging
-                print(f"Warning: Survival prediction failed for patient {patient.get('name')}: {exc}")
+                logger.exception("Survival prediction failed for patient %s: %s", patient.get("name"), exc)
                 survival_5yr.append(None)
                 survival_10yr.append(None)
                 survival_category.append(None)
@@ -375,52 +385,57 @@ def print_survival_summary(results_df: pd.DataFrame) -> None:
     if "survival_5yr" not in results_df.columns:
         return
 
-    print("\n" + "=" * 60)
-    print("⚠️  HAN 2012 SURVIVAL MODEL - CALIBRATION STATUS")
-    print("-" * 60)
-    print("IMPORTANT: These predictions use estimated baseline survival")
-    print("S₀(t) calibrated to match published cohort statistics (Han 2012).")
-    print("Individual predictions may differ from validated nomogram performance.")
-    print("Institutional recalibration required before any clinical use.")
-    print("=" * 60)
+    logger.info("")
+    logger.info("=" * 60)
+    logger.info("⚠️  HAN 2012 SURVIVAL MODEL - CALIBRATION STATUS")
+    logger.info("-" * 60)
+    logger.info("IMPORTANT: These predictions use estimated baseline survival")
+    logger.info("S₀(t) calibrated to match published cohort statistics (Han 2012).")
+    logger.info("Individual predictions may differ from validated nomogram performance.")
+    logger.info("Institutional recalibration required before any clinical use.")
+    logger.info("=" * 60)
 
-    print("\n" + "=" * 60)
-    print("HAN 2012 SURVIVAL MODEL SUMMARY")
-    print("-" * 60)
+    logger.info("")
+    logger.info("=" * 60)
+    logger.info("HAN 2012 SURVIVAL MODEL SUMMARY")
+    logger.info("-" * 60)
 
     surv5 = results_df["survival_5yr"].dropna()
     if not surv5.empty:
-        print("5-Year Survival:")
-        print(f"  Mean:   {surv5.mean() * 100:.1f}%")
-        print(f"  Median: {surv5.median() * 100:.1f}%")
-        print(f"  Range:  {surv5.min() * 100:.1f}% to {surv5.max() * 100:.1f}%")
+        logger.info("5-Year Survival:")
+        logger.info("  Mean:   %.1f%%", surv5.mean() * 100)
+        logger.info("  Median: %.1f%%", surv5.median() * 100)
+        logger.info("  Range:  %.1f%% to %.1f%%", surv5.min() * 100, surv5.max() * 100)
 
     surv10 = results_df["survival_10yr"].dropna() if "survival_10yr" in results_df else pd.Series(dtype=float)
     if not surv10.empty:
-        print("\n10-Year Survival:")
-        print(f"  Mean:   {surv10.mean() * 100:.1f}%")
-        print(f"  Median: {surv10.median() * 100:.1f}%")
-        print(f"  Range:  {surv10.min() * 100:.1f}% to {surv10.max() * 100:.1f}%")
+        logger.info("")
+        logger.info("10-Year Survival:")
+        logger.info("  Mean:   %.1f%%", surv10.mean() * 100)
+        logger.info("  Median: %.1f%%", surv10.median() * 100)
+        logger.info("  Range:  %.1f%% to %.1f%%", surv10.min() * 100, surv10.max() * 100)
 
     if "survival_category" in results_df.columns:
         counts = results_df["survival_category"].value_counts()
         if not counts.empty:
-            print("\nPrognosis Categories:")
+            logger.info("")
+            logger.info("Prognosis Categories:")
             for cat, count in counts.items():
                 pct = count / len(results_df) * 100
-                print(f"  {cat}: {count} ({pct:.1f}%)")
+                logger.info("  %s: %d (%.1f%%)", cat, count, pct)
 
     if {"Risk", "survival_5yr"}.issubset(results_df.columns):
         corr_df = results_df[["Risk", "survival_5yr"]].dropna()
         if len(corr_df) > 10:
             corr = corr_df["Risk"].corr(corr_df["survival_5yr"])
-            print(f"\nCorrelation (Recurrence Risk vs Survival): {corr:.3f}")
+            logger.info("")
+            logger.info("Correlation (Recurrence Risk vs Survival): %.3f", corr)
             if corr < -0.5:
-                print("  ✓ Strong inverse relationship (as expected)")
+                logger.info("  ✓ Strong inverse relationship (as expected)")
             elif corr < -0.3:
-                print("  ⚠ Moderate inverse relationship")
+                logger.info("  ⚠ Moderate inverse relationship")
             else:
-                print("  Note: Weak correlation – investigate cohort differences.")
+                logger.info("  Note: Weak correlation – investigate cohort differences.")
 
 
 def run_example_patients(recurrence_model, survival_model=None):
@@ -472,15 +487,16 @@ def run_example_patients(recurrence_model, survival_model=None):
     results_df = predict_with_both_models(patients, recurrence_model, survival_model)
 
     for row in results_df.itertuples(index=False):
-        print(f"\n{row.Patient}")
-        print(f"  Stage: {row.T_stage}{row.N_stage}")
+        logger.info("")
+        logger.info("%s", row.Patient)
+        logger.info("  Stage: %s%s", row.T_stage, row.N_stage)
         risk_pct = safe_float(row.Risk) * 100.0
-        print(f"  5-Year Recurrence Risk: {risk_pct:.1f}% ({row.Category})")
+        logger.info("  5-Year Recurrence Risk: %.1f%% (%s)", risk_pct, row.Category)
 
         if survival_model and hasattr(row, "survival_5yr") and row.survival_5yr:
             surv_pct = safe_float(row.survival_5yr) * 100.0
             category = getattr(row, "survival_category", "N/A")
-            print(f"  5-Year Survival: {surv_pct:.1f}% ({category})")
+            logger.info("  5-Year Survival: %.1f%% (%s)", surv_pct, category)
 
     return results_df
 
@@ -488,9 +504,10 @@ def run_example_patients(recurrence_model, survival_model=None):
 def run_sensitivity_analysis(model, output_dir: Path, show_plots: bool) -> Path:
     """Illustrate how nodal yield impacts predictions."""
 
-    print("\n" + "=" * 60)
-    print("SENSITIVITY ANALYSIS: Impact of Lymph Node Yield")
-    print("-" * 60)
+    logger.info("")
+    logger.info("=" * 60)
+    logger.info("SENSITIVITY ANALYSIS: Impact of Lymph Node Yield")
+    logger.info("-" * 60)
 
     test_patient = {
         "T_stage": "T2",
@@ -508,7 +525,7 @@ def run_sensitivity_analysis(model, output_dir: Path, show_plots: bool) -> Path:
         test_patient["total_LN"] = ln_yield
         risk = model.calculate_risk(test_patient)
         risks_by_yield.append(risk)
-        print(f"LN Yield = {ln_yield:2d} → Risk = {risk * 100:.1f}%")
+        logger.info("LN Yield = %2d → Risk = %.1f%%", ln_yield, risk * 100)
 
     fig = plt.figure(figsize=(10, 6))
     plt.plot(ln_yields, [r * 100 for r in risks_by_yield], "o-", linewidth=2, markersize=8)
@@ -523,10 +540,11 @@ def run_sensitivity_analysis(model, output_dir: Path, show_plots: bool) -> Path:
     plt.tight_layout()
     output_path = finalize_figure(fig, output_dir / FIG_SENSITIVITY, show_plots)
 
-    print("\n" + "=" * 60)
-    print("Key Insight: Higher LN yield reduces estimated risk due to")
-    print("lower positive/total ratio, highlighting importance of")
-    print("adequate D2 dissection for accurate staging.")
+    logger.info("")
+    logger.info("=" * 60)
+    logger.info("Key Insight: Higher LN yield reduces estimated risk due to")
+    logger.info("lower positive/total ratio, highlighting importance of")
+    logger.info("adequate D2 dissection for accurate staging.")
     return output_path
 
 
@@ -534,7 +552,7 @@ def load_tcga_cohort(data_path):
     """Load and harmonize the anonymized TCGA cohort."""
 
     if not data_path.exists():
-        print(f"TCGA file not found at {data_path}.")
+        logger.warning("TCGA file not found at %s.", data_path)
         return pd.DataFrame()
 
     rename_map = {
@@ -553,7 +571,7 @@ def load_tcga_cohort(data_path):
     try:
         df = pd.read_csv(data_path, sep="\t")
     except Exception as exc:  # pragma: no cover - defensive for parsing errors
-        print(f"Unable to parse TCGA cohort: {exc}")
+        logger.warning("Unable to parse TCGA cohort: %s", exc)
         return pd.DataFrame()
 
     cohort = df.rename(columns=rename_map)
@@ -706,7 +724,7 @@ def analyze_tcga_cohort(
 
     cohort = load_tcga_cohort(data_path)
     if cohort.empty:
-        print("\nTCGA cohort not analyzed (file missing or parsing failed).")
+        logger.warning("TCGA cohort not analyzed (file missing or parsing failed).")
         return []
 
     sex_col = None
@@ -718,7 +736,7 @@ def analyze_tcga_cohort(
         cohort["Sex"] = cohort[sex_col]
     else:
         cohort["Sex"] = "Male"
-        print("Warning: Sex column not found; defaulting to Male for survival predictions.")
+        logger.warning("Sex column not found; defaulting to Male for survival predictions.")
 
     patient_inputs = []
     for row in cohort.itertuples(index=False):
@@ -750,35 +768,38 @@ def analyze_tcga_cohort(
         right_on="patient_id",
     ).drop(columns=["patient_id"])
 
-    print("\n" + "=" * 60)
-    print("TCGA-2018 Clinical Cohort Integration")
-    print("-" * 60)
-    print(f"Patients scored: {len(cohort_results)}")
-    print(f"Median predicted risk: {cohort_results['Risk'].median() * 100:.1f}%")
+    logger.info("")
+    logger.info("=" * 60)
+    logger.info("TCGA-2018 Clinical Cohort Integration")
+    logger.info("-" * 60)
+    logger.info("Patients scored: %d", len(cohort_results))
+    logger.info("Median predicted risk: %.1f%%", cohort_results["Risk"].median() * 100)
 
     category_counts = cohort_results["Category"].value_counts().sort_index()
     for label, count in category_counts.items():
-        print(f"  {label:<12}: {count}")
+        logger.info("  %-12s: %d", label, count)
 
     subtype_counts = (
         cohort_results["molecular_subtype"].fillna("Unknown").value_counts().head(3)
     )
-    print("Top molecular subtypes represented:")
+    logger.info("Top molecular subtypes represented:")
     for label, count in subtype_counts.items():
-        print(f"  {label:<12}: {count}")
+        logger.info("  %-12s: %d", label, count)
 
     tumor_imputed_pct = cohort_results["tumor_size_imputed"].mean() * 100
     ln_imputed_pct = cohort_results["ln_ratio_imputed"].mean() * 100
-    print("\nData Quality Assessment:")
-    print("-" * 60)
-    print(f"  Tumor size imputed: {tumor_imputed_pct:.1f}% (stage-informed estimates)")
-    print(f"  LN ratio imputed: {ln_imputed_pct:.1f}% (N-stage-derived)")
-    print("  Tumor location imputed: 100.0% (epidemiological priors)")
+    logger.info("")
+    logger.info("Data Quality Assessment:")
+    logger.info("-" * 60)
+    logger.info("  Tumor size imputed: %.1f%% (stage-informed estimates)", tumor_imputed_pct)
+    logger.info("  LN ratio imputed: %.1f%% (N-stage-derived)", ln_imputed_pct)
+    logger.info("  Tumor location imputed: 100.0% (epidemiological priors)")
 
     if tumor_imputed_pct > 90:
-        print("\n⚠️  CRITICAL: >90% variable imputation detected.")
-        print("   Predictions represent stage-typical, not patient-specific, risk.")
-        print("   Suitable for cohort-level validation only.")
+        logger.warning("")
+        logger.warning("⚠️  CRITICAL: >90% variable imputation detected.")
+        logger.warning("   Predictions represent stage-typical, not patient-specific, risk.")
+        logger.warning("   Suitable for cohort-level validation only.")
 
     generated_paths: list[Path] = []
     summary_fig = plot_tcga_summary(cohort_results, output_dir, show_plots)
@@ -790,10 +811,10 @@ def analyze_tcga_cohort(
     if calibration_result:
         calibration_fig, brier = calibration_result
         generated_paths.append(calibration_fig)
-        print(f"Brier score (recurrence model vs. DFS): {brier:.3f}")
-        print("⚠️  Note: Poor calibration reflects outcome mismatch, not model failure.")
-        print("    The model predicts recurrence; TCGA provides disease-free survival.")
-        print("    These are related but distinct clinical endpoints.")
+        logger.info("Brier score (recurrence model vs. DFS): %.3f", brier)
+        logger.info("⚠️  Note: Poor calibration reflects outcome mismatch, not model failure.")
+        logger.info("    The model predicts recurrence; TCGA provides disease-free survival.")
+        logger.info("    These are related but distinct clinical endpoints.")
 
     if survival_model and "survival_5yr" in cohort_results.columns:
         survival_fig = plot_survival_predictions(cohort_results, output_dir, show_plots)
@@ -810,24 +831,34 @@ def analyze_tcga_cohort(
 def main():
     args = parse_args()
 
-    print("Gastric Cancer Risk Calculator (Dual Model)")
-    print("=" * 60)
-    print(f"Data path: {args.data}")
-    print(f"Output directory: {args.output_dir}")
+    logger = setup_logging(level=logging.DEBUG if args.verbose else logging.INFO)
+
+    # Ensure reproducible tumor location imputation across runs
+    from models.variable_mapper_tcga import reset_imputation_seed
+    reset_imputation_seed(42)
+
+    logger.info("Gastric Cancer Risk Calculator (Dual Model)")
+    logger.info("=" * 60)
+    logger.info("Data path: %s", args.data)
+    logger.info("Output directory: %s", args.output_dir)
 
     model_config = load_model_config(args.model_config)
-    print(f"Recurrence model: {model_config.get('id', 'custom')} – {model_config.get('name', 'N/A')}")
+    logger.info(
+        "Recurrence model: %s – %s",
+        model_config.get("id", "custom"),
+        model_config.get("name", "N/A"),
+    )
     recurrence_model = GastricCancerRiskModel(model_config)
 
     survival_model = None
     if args.skip_survival:
-        print("Survival model: Skipped (flag provided)")
+        logger.info("Survival model: Skipped (flag provided)")
     else:
         survival_model = load_survival_model(args.survival_model)
         if survival_model:
-            print("Survival model: Han 2012 D2 Gastrectomy Nomogram")
+            logger.info("Survival model: Han 2012 D2 Gastrectomy Nomogram")
         else:
-            print("Survival model: Not available (recurrence only)")
+            logger.warning("Survival model: Not available (recurrence only)")
 
     example_results = run_example_patients(recurrence_model, survival_model)
 
@@ -845,9 +876,10 @@ def main():
     if tcga_figs:
         generated_files.extend(tcga_figs)
 
-    print("\nGenerated files:")
+    logger.info("")
+    logger.info("Generated files:")
     for path in generated_files:
-        print(f"  - {path}")
+        logger.info("  - %s", path)
 
 
 if __name__ == "__main__":

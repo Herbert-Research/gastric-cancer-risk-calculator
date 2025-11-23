@@ -1,5 +1,7 @@
 """Shared constants for stage-informed imputations and defaults."""
 
+from __future__ import annotations
+
 T_STAGE_PRIOR_SIZE = {
     "T1": 2.0,
     "T2": 3.5,
